@@ -12,7 +12,9 @@ export default function PatientDetailsPage() {
   const router = useRouter();
   const [patient, setPatient] = useState<any>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   
   // Clinical Notes State
   const [showNoteForm, setShowNoteForm] = useState<string | null>(null);
@@ -33,7 +35,41 @@ export default function PatientDetailsPage() {
     const { data: aData } = await supabase.from('appointments').select('*').eq('patient_id', id).order('date', { ascending: false });
     if (aData) setAppointments(aData);
 
+    // Fetch documents
+    const { data: dData } = await supabase.from('documents').select('*').eq('patient_id', id).order('created_at', { ascending: false });
+    if (dData) setDocuments(dData);
+
     setLoading(false);
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `${id}/${fileName}`;
+
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
+
+    if (uploadError) {
+      alert("Error al subir archivo (Asegúrate de haber creado el bucket 'documents' en Supabase): " + uploadError.message);
+      setUploading(false);
+      return;
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+
+    // Save record in database
+    await supabase.from('documents').insert([
+      { patient_id: id, name: file.name, url: publicUrlData.publicUrl }
+    ]);
+
+    fetchPatientData();
+    setUploading(false);
   }
 
   async function saveNote(appointmentId: string) {
@@ -103,10 +139,29 @@ export default function PatientDetailsPage() {
               <div className="panel-header">
                 Archivos y Documentos
               </div>
-              <div className="panel-body" style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <FileText size={32} style={{ margin: '0 auto 12px', color: 'var(--c-muted)' }} />
-                <div style={{ fontSize: '14px', color: 'var(--c-text-2)', marginBottom: '16px' }}>Módulo de documentos en construcción</div>
-                <button className="btn-primary" style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}>Subir Archivo</button>
+              <div className="panel-body">
+                {documents.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                    <FileText size={32} style={{ margin: '0 auto 12px', color: 'var(--c-muted)' }} />
+                    <div style={{ fontSize: '13px', color: 'var(--c-text-2)', marginBottom: '16px' }}>No hay archivos adjuntos.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                    {documents.map(doc => (
+                      <a key={doc.id} href={doc.url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'var(--c-surface2)', borderRadius: '6px', color: 'var(--c-text)', textDecoration: 'none', fontSize: '13px', border: '1px solid var(--c-border)' }}>
+                        <FileText size={16} color="var(--c-primary)" />
+                        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+                
+                <div style={{ textAlign: 'center' }}>
+                  <input type="file" id="file-upload" style={{ display: 'none' }} onChange={handleFileUpload} disabled={uploading} />
+                  <label htmlFor="file-upload" className="btn-primary" style={{ background: 'var(--c-surface2)', color: 'var(--c-text)', cursor: uploading ? 'not-allowed' : 'pointer', display: 'inline-block', width: '100%' }}>
+                    {uploading ? 'Subiendo...' : 'Subir Nuevo Archivo'}
+                  </label>
+                </div>
               </div>
             </div>
           </div>

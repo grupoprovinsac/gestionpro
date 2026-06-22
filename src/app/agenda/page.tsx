@@ -4,15 +4,19 @@ import { useState, useEffect } from 'react';
 import Topbar from '@/components/Topbar';
 import { supabase } from '@/lib/supabase';
 import { Calendar as CalendarIcon, Clock, Plus, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import 'moment/locale/es';
+
+moment.locale('es');
+const localizer = momentLocalizer(moment);
 
 export default function AgendaPage() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  
-  // Date state
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     patient_id: '',
@@ -26,7 +30,7 @@ export default function AgendaPage() {
 
   useEffect(() => {
     fetchData();
-  }, [currentDate]);
+  }, []);
 
   async function fetchData() {
     setLoading(true);
@@ -34,20 +38,30 @@ export default function AgendaPage() {
     if (orgs && orgs.length > 0) {
       const orgId = orgs[0].id;
       
-      // Fetch patients for dropdown
       const { data: pats } = await supabase.from('patients').select('id, first_name, last_name, dni').eq('org_id', orgId);
       if (pats) setPatients(pats);
 
-      // Fetch appointments for current month/week
-      // For simplicity, we fetch all and filter client side
       const { data: apps } = await supabase
         .from('appointments')
         .select(`*, patients (first_name, last_name, dni)`)
-        .eq('org_id', orgId)
-        .order('date', { ascending: true })
-        .order('start_time', { ascending: true });
+        .eq('org_id', orgId);
         
-      if (apps) setAppointments(apps);
+      if (apps) {
+        setAppointments(apps);
+        // Map to react-big-calendar events
+        const formattedEvents = apps.map(app => {
+          const startDate = new Date(`${app.date}T${app.start_time}`);
+          const endDate = new Date(startDate.getTime() + app.duration_minutes * 60000);
+          return {
+            id: app.id,
+            title: `${app.patients?.first_name} ${app.patients?.last_name} - ${app.procedure_name || 'Cita'}`,
+            start: startDate,
+            end: endDate,
+            resource: app
+          };
+        });
+        setEvents(formattedEvents);
+      }
     }
     setLoading(false);
   }
@@ -68,7 +82,6 @@ export default function AgendaPage() {
       setShowForm(false);
       fetchData();
       
-      // Enviar correo de confirmación
       const p = patients.find(pat => pat.id === formData.patient_id);
       if (p && p.email) {
         await fetch('/api/email', {
@@ -90,32 +103,38 @@ export default function AgendaPage() {
 
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'Atendida': return 'var(--c-success)';
-      case 'Cancelada': return 'var(--c-danger)';
-      default: return 'var(--c-primary)';
+      case 'Atendida': return '#2ecc71';
+      case 'Cancelada': return '#e74c3c';
+      default: return '#3b82f6';
     }
   }
 
+  const eventStyleGetter = (event: any) => {
+    const backgroundColor = getStatusColor(event.resource.status);
+    return {
+      style: {
+        backgroundColor,
+        borderRadius: '4px',
+        opacity: 0.9,
+        color: 'white',
+        border: 'none',
+        display: 'block'
+      }
+    };
+  };
+
   return (
     <>
-      <Topbar title="Agenda Clínica" />
-      <div className="content-area">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ background: 'var(--c-surface)', padding: '6px', borderRadius: 'var(--radius)', display: 'flex', gap: '4px' }}>
-              <button onClick={() => { const d = new Date(currentDate); d.setDate(d.getDate() - 1); setCurrentDate(d); }} style={{ background: 'transparent', border: 'none', color: 'var(--c-text)', cursor: 'pointer', padding: '4px' }}><ChevronLeft size={20}/></button>
-              <div style={{ padding: '4px 12px', fontWeight: 600 }}>{currentDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-              <button onClick={() => { const d = new Date(currentDate); d.setDate(d.getDate() + 1); setCurrentDate(d); }} style={{ background: 'transparent', border: 'none', color: 'var(--c-text)', cursor: 'pointer', padding: '4px' }}><ChevronRight size={20}/></button>
-            </div>
-            <button onClick={() => setCurrentDate(new Date())} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', color: 'var(--c-text)', padding: '8px 16px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Hoy</button>
-          </div>
+      <Topbar title="Agenda Clínica Interactiva" />
+      <div className="content-area" style={{ height: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
           <button className="btn-primary" onClick={() => setShowForm(true)}>
             <Plus size={16} /> Nueva Cita
           </button>
         </div>
 
         {showForm && (
-          <div className="panel" style={{ marginBottom: '24px', borderColor: 'var(--c-primary)' }}>
+          <div className="panel" style={{ marginBottom: '24px', borderColor: 'var(--c-primary)', flexShrink: 0 }}>
             <div className="panel-header" style={{ background: 'var(--c-surface2)' }}>
               Agendar Nueva Cita
             </div>
@@ -162,63 +181,28 @@ export default function AgendaPage() {
           </div>
         )}
 
-        <div className="panel">
-          <div className="panel-header">
-            Citas del día ({currentDate.toLocaleDateString()})
-          </div>
-          <div className="panel-body">
+        <div className="panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="panel-body" style={{ flex: 1, padding: '20px' }}>
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--c-muted)' }}>Cargando agenda...</div>
-            ) : appointments.filter(a => a.date === currentDate.toISOString().split('T')[0]).length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--c-muted)' }}>
-                <CalendarIcon size={48} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
-                <p>No hay citas programadas para esta fecha.</p>
-              </div>
+              <div style={{ textAlign: 'center', color: 'var(--c-muted)', padding: '40px' }}>Cargando calendario...</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {appointments.filter(a => a.date === currentDate.toISOString().split('T')[0]).map(app => (
-                  <div key={app.id} style={{ display: 'flex', background: 'var(--c-surface2)', border: '1px solid var(--c-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-                    <div style={{ width: '6px', background: getStatusColor(app.status) }}></div>
-                    <div style={{ padding: '16px', flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      
-                      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                        <div style={{ textAlign: 'center', minWidth: '80px' }}>
-                          <div style={{ fontSize: '18px', fontWeight: 700 }}>{app.start_time.substring(0,5)}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--c-muted)', textTransform: 'uppercase' }}>{app.duration_minutes} min</div>
-                        </div>
-                        
-                        <div>
-                          <div style={{ fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <User size={14} color="var(--c-muted)" /> 
-                            {app.patients?.first_name} {app.patients?.last_name}
-                          </div>
-                          <div style={{ fontSize: '13px', color: 'var(--c-text-2)', marginTop: '4px' }}>
-                            {app.procedure_name || 'Consulta General'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ 
-                          display: 'inline-block', 
-                          padding: '4px 10px', 
-                          borderRadius: '12px', 
-                          fontSize: '11px', 
-                          fontWeight: 600,
-                          background: `${getStatusColor(app.status)}20`,
-                          color: getStatusColor(app.status)
-                        }}>
-                          {app.status}
-                        </span>
-                        <div style={{ fontSize: '12px', color: 'var(--c-muted)', marginTop: '6px' }}>
-                          Doctor: {app.professional_name}
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Calendar
+                localizer={localizer}
+                events={events}
+                startAccessor="start"
+                endAccessor="end"
+                style={{ height: '100%', minHeight: '600px', color: 'var(--c-text)' }}
+                eventPropGetter={eventStyleGetter}
+                messages={{
+                  next: "Siguiente",
+                  previous: "Anterior",
+                  today: "Hoy",
+                  month: "Mes",
+                  week: "Semana",
+                  day: "Día",
+                  agenda: "Lista"
+                }}
+              />
             )}
           </div>
         </div>
