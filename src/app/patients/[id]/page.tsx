@@ -1,0 +1,142 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import Topbar from '@/components/Topbar';
+import { ChevronLeft, User, Phone, Mail, Calendar, FileText, Activity, CreditCard } from 'lucide-react';
+import Link from 'next/link';
+
+export default function PatientDetailsPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const [patient, setPatient] = useState<any>(null);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) fetchPatientData();
+  }, [id]);
+
+  async function fetchPatientData() {
+    setLoading(true);
+    
+    // Fetch patient info
+    const { data: pData } = await supabase.from('patients').select('*').eq('id', id).single();
+    if (pData) setPatient(pData);
+
+    // Fetch patient appointments/history
+    const { data: aData } = await supabase.from('appointments').select('*').eq('patient_id', id).order('date', { ascending: false });
+    if (aData) setAppointments(aData);
+
+    setLoading(false);
+  }
+
+  if (loading) return <div style={{padding: '40px', color: 'var(--c-text-2)'}}>Cargando paciente...</div>;
+  if (!patient) return <div style={{padding: '40px', color: 'var(--c-danger)'}}>Paciente no encontrado</div>;
+
+  return (
+    <>
+      <Topbar title={`Historia Clínica: ${patient.first_name}`} />
+      <div className="content-area">
+        
+        <Link href="/patients" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--c-text-2)', textDecoration: 'none', marginBottom: '24px', fontSize: '14px', fontWeight: 500 }}>
+          <ChevronLeft size={16} /> Volver a Pacientes
+        </Link>
+
+        <div className="dashboard-grid">
+          
+          {/* Columna Izquierda: Datos del Paciente */}
+          <div>
+            <div className="panel" style={{ marginBottom: '20px' }}>
+              <div className="panel-header">
+                Datos Personales
+              </div>
+              <div className="panel-body">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'var(--c-surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-muted)' }}>
+                    <User size={32} />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>{patient.first_name} {patient.last_name}</h2>
+                    <div style={{ color: 'var(--c-text-2)', fontSize: '14px', marginTop: '4px' }}>DNI: {patient.dni}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: 'var(--c-text)' }}>
+                    <Phone size={16} color="var(--c-muted)" /> {patient.phone || 'No registrado'}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: 'var(--c-text)' }}>
+                    <Mail size={16} color="var(--c-muted)" /> {patient.email || 'No registrado'}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: 'var(--c-text)' }}>
+                    <Calendar size={16} color="var(--c-muted)" /> Registrado: {new Date(patient.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                Archivos y Documentos
+              </div>
+              <div className="panel-body" style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <FileText size={32} style={{ margin: '0 auto 12px', color: 'var(--c-muted)' }} />
+                <div style={{ fontSize: '14px', color: 'var(--c-text-2)', marginBottom: '16px' }}>Módulo de documentos en construcción</div>
+                <button className="btn-primary" style={{ background: 'var(--c-surface2)', color: 'var(--c-text)' }}>Subir Archivo</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Columna Derecha: Historial y Evolución */}
+          <div>
+            <div className="panel">
+              <div className="panel-header">
+                Historial de Atenciones
+              </div>
+              <div className="panel-body">
+                {appointments.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--c-muted)' }}>
+                    <Activity size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                    <p>No hay atenciones registradas para este paciente.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {appointments.map(app => (
+                      <div key={app.id} style={{ borderLeft: `2px solid var(--c-primary)`, paddingLeft: '16px', position: 'relative' }}>
+                        <div style={{ position: 'absolute', left: '-5px', top: '0', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--c-primary)' }}></div>
+                        
+                        <div style={{ fontSize: '12px', color: 'var(--c-text-2)', fontWeight: 600, marginBottom: '4px' }}>
+                          {new Date(app.date).toLocaleDateString()} • {app.start_time.substring(0,5)}
+                        </div>
+                        
+                        <div style={{ background: 'var(--c-surface2)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--c-border)' }}>
+                          <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                            {app.procedure_name || 'Consulta General'}
+                            <span style={{ fontSize: '11px', padding: '2px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px' }}>{app.status}</span>
+                          </div>
+                          <div style={{ fontSize: '13px', color: 'var(--c-text-2)', lineHeight: 1.5 }}>
+                            <strong>Doctor:</strong> {app.professional_name}
+                          </div>
+                          
+                          {/* Notas de evolución simuladas */}
+                          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--c-border)', fontSize: '13px', color: 'var(--c-text)' }}>
+                            <em>No hay notas clínicas registradas para esta cita.</em>
+                          </div>
+                          
+                          <button style={{ marginTop: '12px', background: 'transparent', border: 'none', color: 'var(--c-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar Nota Clínica</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </>
+  );
+}

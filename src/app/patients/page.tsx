@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Topbar from '@/components/Topbar';
 import { supabase } from '@/lib/supabase';
 import { Users, Plus, Search, Mail, Phone, Calendar } from 'lucide-react';
 
 export default function PatientsPage() {
+  const router = useRouter();
   const [patients, setPatients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -152,7 +154,13 @@ export default function PatientsPage() {
                   </tr>
                 ) : (
                   patients.map(p => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid var(--c-border)', transition: 'background 0.2s' }}>
+                    <tr 
+                      key={p.id} 
+                      onClick={() => router.push(`/patients/${p.id}`)}
+                      style={{ borderBottom: '1px solid var(--c-border)', transition: 'background 0.2s', cursor: 'pointer' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--c-surface2)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
                       <td style={{ padding: '16px 20px', fontSize: '14px', fontFamily: 'monospace' }}>{p.dni}</td>
                       <td style={{ padding: '16px 20px' }}>
                         <div style={{ fontWeight: 500 }}>{p.first_name} {p.last_name}</div>
