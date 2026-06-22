@@ -13,6 +13,10 @@ export default function PatientDetailsPage() {
   const [patient, setPatient] = useState<any>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Clinical Notes State
+  const [showNoteForm, setShowNoteForm] = useState<string | null>(null);
+  const [noteContent, setNoteContent] = useState('');
 
   useEffect(() => {
     if (id) fetchPatientData();
@@ -30,6 +34,24 @@ export default function PatientDetailsPage() {
     if (aData) setAppointments(aData);
 
     setLoading(false);
+  }
+
+  async function saveNote(appointmentId: string) {
+    if (!noteContent.trim()) return;
+    
+    // Aquí actualizaríamos el registro de la cita con las notas de evolución
+    const { error } = await supabase
+      .from('appointments')
+      .update({ notes: noteContent })
+      .eq('id', appointmentId);
+      
+    if (!error) {
+      setShowNoteForm(null);
+      setNoteContent('');
+      fetchPatientData(); // Recargar datos
+    } else {
+      alert("Error al guardar nota: " + error.message);
+    }
   }
 
   if (loading) return <div style={{padding: '40px', color: 'var(--c-text-2)'}}>Cargando paciente...</div>;
@@ -120,12 +142,36 @@ export default function PatientDetailsPage() {
                             <strong>Doctor:</strong> {app.professional_name}
                           </div>
                           
-                          {/* Notas de evolución simuladas */}
+                          {/* Notas de evolución */}
                           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--c-border)', fontSize: '13px', color: 'var(--c-text)' }}>
-                            <em>No hay notas clínicas registradas para esta cita.</em>
+                            {app.notes ? (
+                              <div style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                <strong>Evolución Médica:</strong><br/>
+                                {app.notes}
+                              </div>
+                            ) : (
+                              <em style={{ color: 'var(--c-text-2)' }}>No hay notas clínicas registradas para esta cita.</em>
+                            )}
                           </div>
                           
-                          <button style={{ marginTop: '12px', background: 'transparent', border: 'none', color: 'var(--c-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar Nota Clínica</button>
+                          {showNoteForm === app.id ? (
+                            <div style={{ marginTop: '12px' }}>
+                              <textarea 
+                                value={noteContent}
+                                onChange={e => setNoteContent(e.target.value)}
+                                placeholder="Escribe la evaluación, tratamiento, recetas..."
+                                style={{ width: '100%', height: '80px', padding: '8px', background: 'var(--c-bg)', border: '1px solid var(--c-primary)', borderRadius: '4px', color: '#fff', marginBottom: '8px' }}
+                              />
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => saveNote(app.id)} style={{ background: 'var(--c-primary)', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Guardar</button>
+                                <button onClick={() => { setShowNoteForm(null); setNoteContent(''); }} style={{ background: 'transparent', color: 'var(--c-text)', border: '1px solid var(--c-border)', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancelar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setShowNoteForm(app.id); setNoteContent(app.notes || ''); }} style={{ marginTop: '12px', background: 'transparent', border: 'none', color: 'var(--c-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                              {app.notes ? 'Editar Nota' : '+ Agregar Nota Clínica'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

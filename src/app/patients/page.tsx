@@ -9,6 +9,8 @@ import { Users, Plus, Search, Mail, Phone, Calendar } from 'lucide-react';
 export default function PatientsPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<any[]>([]);
+  const [filteredPatients, setFilteredPatients] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   
@@ -36,10 +38,26 @@ export default function PatientsPage() {
         .eq('org_id', orgs[0].id)
         .order('created_at', { ascending: false });
       
-      if (data) setPatients(data);
+      if (data) {
+        setPatients(data);
+        setFilteredPatients(data);
+      }
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (searchTerm === '') {
+      setFilteredPatients(patients);
+    } else {
+      const lower = searchTerm.toLowerCase();
+      setFilteredPatients(patients.filter(p => 
+        p.first_name.toLowerCase().includes(lower) || 
+        p.last_name.toLowerCase().includes(lower) || 
+        p.dni.includes(lower)
+      ));
+    }
+  }, [searchTerm, patients]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +99,8 @@ export default function PatientsPage() {
             <input 
               type="text" 
               placeholder="Buscar por DNI o Nombre..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 width: '100%',
                 padding: '8px 16px 8px 36px',
@@ -154,15 +174,15 @@ export default function PatientsPage() {
               <tbody>
                 {loading ? (
                   <tr><td colSpan={4} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--c-muted)' }}>Cargando datos...</td></tr>
-                ) : patients.length === 0 ? (
+                ) : filteredPatients.length === 0 ? (
                   <tr>
                     <td colSpan={4} style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--c-muted)' }}>
                       <Users size={48} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
-                      <p>Aún no hay pacientes registrados.</p>
+                      <p>Aún no hay pacientes registrados o no hay coincidencias con tu búsqueda.</p>
                     </td>
                   </tr>
                 ) : (
-                  patients.map(p => (
+                  filteredPatients.map(p => (
                     <tr 
                       key={p.id} 
                       onClick={() => router.push(`/patients/${p.id}`)}
