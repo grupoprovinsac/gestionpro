@@ -43,8 +43,17 @@ export default function PatientsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const { data: orgs } = await supabase.from('organizations').select('id').limit(1);
-    if (!orgs || orgs.length === 0) return;
+    const { data: orgs, error: orgError } = await supabase.from('organizations').select('id').limit(1);
+    
+    if (orgError) {
+      alert("Error de conexión con la base de datos: " + orgError.message);
+      return;
+    }
+    
+    if (!orgs || orgs.length === 0) {
+      alert("Error crítico: No se encontró la organización en la base de datos. Verifica la conexión.");
+      return;
+    }
 
     const { error } = await supabase.from('patients').insert([
       { 

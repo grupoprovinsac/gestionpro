@@ -67,7 +67,21 @@ export default function AgendaPage() {
     if (!error) {
       setShowForm(false);
       fetchData();
-      // Reset some fields
+      
+      // Enviar correo de confirmación
+      const p = patients.find(pat => pat.id === formData.patient_id);
+      if (p && p.email) {
+        await fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: p.email,
+            subject: 'Confirmación de Cita - GestionPro Dental',
+            html: `<h3>Hola ${p.first_name},</h3><p>Tu cita para <strong>${formData.procedure_name || 'Consulta'}</strong> ha sido agendada para el <strong>${formData.date}</strong> a las <strong>${formData.start_time}</strong>.</p><p>Te esperamos.</p>`
+          })
+        });
+      }
+
       setFormData({...formData, procedure_name: ''});
     } else {
       alert("Error al agendar cita: " + error.message);
