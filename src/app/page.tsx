@@ -11,7 +11,7 @@ import {
   Settings,
   Plus,
   Menu,
-  Tooth
+  Activity
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -22,7 +22,7 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <Tooth className="sidebar-logo" color="var(--c-primary)" />
+          <Activity className="sidebar-logo" color="var(--c-primary)" />
           <div className="sidebar-title">
             GestionPro
             <span>CRM Dental</span>
@@ -30,7 +30,7 @@ export default function Dashboard() {
         </div>
 
         <div className="org-selector">
-          <div className="org-icon"><Tooth size={18} /></div>
+          <div className="org-icon"><Activity size={18} /></div>
           <div className="org-name">Grupo Provin SAC<br/><span style={{fontSize:'11px', color:'var(--c-text-2)', fontWeight:400}}>Clínica Principal</span></div>
         </div>
 
